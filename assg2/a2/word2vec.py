@@ -61,13 +61,14 @@ def naiveSoftmaxLossAndGradient(
 
     U = outsideVectors
     o = outsideWordIdx
-    vc = centerWordVec
+    vc = np.expand_dims(centerWordVec, 1) # make it 2D column
 
-    y = softmax(np.transpose(U)*vc)
-    loss = -np.log(y[o])
-    gradCenterVec = U*y - U[:, o]
-    gradOutsideVecs = vc*np.transpose(y)
-    gradOutsideVecs[:, o] = gradOutsideVecs[:, o] - vc
+    y = softmax(U.dot(vc))
+    loss = -np.log(y[o, 0])
+    gradCenterVec = U.transpose().dot(y) - U[o, :]
+    y_ = y
+    y_[o, 0] = y_[o, 0]-1
+    gradOutsideVecs = y_.dot(vc.transpose())
 
     ### END YOUR CODE
 
@@ -112,9 +113,21 @@ def negSamplingLossAndGradient(
     negSampleWordIndices = getNegativeSamples(outsideWordIdx, dataset, K)
     indices = [outsideWordIdx] + negSampleWordIndices
 
+
     ### YOUR CODE HERE
+    U = outsideVectors
+    o = outsideWordIdx
+    vc = centerWordVec
+    gradOutsideVecs = np.zeros_like(U)
+
+    sig0 = sigmoid(np.dot(U[:, o], vc))
+    sigk = sigmoid(-np.dot(np.transpose(U[:, negSampleWordIndices]), vc))
+    loss = -np.log(sig0) - np.sum(np.log(sigk))
 
     ### Please use your implementation of sigmoid in here.
+    gradCenterVec = (sig0 - 1)*U[:, o] + np.sum(U[:, negSampleWordIndices]*(1-sigk), 1)
+    gradOutsideVecs[:, o] = (sig0-1)*vc
+    gradOutsideVecs[:, negSampleWordIndices] = vc*(1-sigk) #not sure if I need to reshape vc to 1d matrix or leave it as vector
 
 
     ### END YOUR CODE
@@ -154,10 +167,22 @@ def skipgram(currentCenterWord, windowSize, outsideWords, word2Ind,
     """
 
     loss = 0.0
-    gradCenterVecs = np.zeros(centerWordVectors.shape)
-    gradOutsideVectors = np.zeros(outsideVectors.shape)
+    gradCenterVecs = np.zeros(centerWordVectors.shape)  # V
+    gradOutsideVectors = np.zeros(outsideVectors.shape) # U
 
     ### YOUR CODE HERE
+    c = word2Ind[currentCenterWord]
+    gradVc_sum = np.zeros_like(gradCenterVecs[0, :])
+    for outsideWord in outsideWords:
+        l, gradVc, gradU = word2vecLossAndGradient(centerWordVectors[c, :],
+                                word2Ind[outsideWord],
+                                outsideVectors,
+                                dataset)
+        gradVc_sum += gradVc
+        gradOutsideVectors += gradU
+        loss += l
+    gradCenterVecs[c, :] = gradVc_sum
+
 
     ### END YOUR CODE
 
