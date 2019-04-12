@@ -7,6 +7,7 @@ Sahil Chopra <schopra8@stanford.edu>
 """
 
 import sys
+from collections import deque
 
 class PartialParse(object):
     def __init__(self, sentence):
@@ -19,6 +20,12 @@ class PartialParse(object):
         self.sentence = sentence
 
         ### YOUR CODE HERE (3 Lines)
+
+        self.stack = ['ROOT']
+        # shallow copy, not directly passing
+        self.buffer = list(self.sentence)
+        self.dependencies = []
+
         ### Your code should initialize the following fields:
         ###     self.stack: The current stack represented as a list with the top of the stack as the
         ###                 last element of the list.
@@ -43,6 +50,16 @@ class PartialParse(object):
                                 transition is a legal transition.
         """
         ### YOUR CODE HERE (~7-10 Lines)
+        if transition == "S":
+            self.stack.append(self.buffer.pop(0))
+
+        elif transition == "LA":
+            self.dependencies.append((self.stack[-1], self.stack.pop(-2)))
+
+        elif transition == "RA":
+            self.dependencies.append((self.stack[-2], self.stack.pop(-1)))
+
+
         ### TODO:
         ###     Implement a single parsing step, i.e. the logic for the following as
         ###     described in the pdf handout:
@@ -86,8 +103,23 @@ def minibatch_parse(sentences, model, batch_size):
                                                     contain the parse for sentences[i]).
     """
     dependencies = []
-
     ### YOUR CODE HERE (~8-10 Lines)
+
+    # initializing
+    partial_parses = [PartialParse(sentence) for sentence in sentences]
+
+    #print(model.predict(partial_parses))
+    unfinished_parses = partial_parses[:]
+
+    # start parsing:
+    while len(unfinished_parses) != 0:
+        batch_parses = unfinished_parses[:batch_size]
+        transitions = model.predict(batch_parses)
+        [parser.parse_step(transitions[i]) for i, parser in enumerate(batch_parses)]
+        [unfinished_parses.remove(parser) for parser in unfinished_parses if (len(parser.buffer)==0 and len(parser.stack)==1)]
+
+    dependencies = [parser.dependencies for parser in partial_parses]
+
     ### TODO:
     ###     Implement the minibatch parse algorithm as described in the pdf handout
     ###
