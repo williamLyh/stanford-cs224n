@@ -33,7 +33,6 @@ class ParserModel(nn.Module):
     def __init__(self, embeddings, n_features=36,
         hidden_size=200, n_classes=3, dropout_prob=0.5):
         """ Initialize the parser model.
-
         @param embeddings (Tensor): word embeddings (num_words, embedding_size)
         @param n_features (int): number of input features
         @param hidden_size (int): number of hidden units
@@ -50,6 +49,15 @@ class ParserModel(nn.Module):
         self.pretrained_embeddings.weight = nn.Parameter(torch.tensor(embeddings))
 
         ### YOUR CODE HERE (~5 Lines)
+        self.embed_to_hidden = nn.Linear(n_features, hidden_size)
+        nn.init.xavier_normal_(self.embed_to_hidden, gain=1)
+
+        self.dropout = nn.Dropout(p=dropout_prob)
+
+        self.hidden_to_logits = nn.Linear(hidden_size, n_classes)
+        nn.init.xavier_normal_(self.hidden_to_logits, gain=1)
+
+
         ### TODO:
         ###     1) Construct `self.embed_to_hidden` linear layer, initializing the weight matrix
         ###         with the `nn.init.xavier_uniform_` function with `gain = 1` (default)
