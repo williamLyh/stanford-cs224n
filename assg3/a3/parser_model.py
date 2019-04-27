@@ -47,15 +47,15 @@ class ParserModel(nn.Module):
         self.hidden_size = hidden_size
         self.pretrained_embeddings = nn.Embedding(embeddings.shape[0], self.embed_size)
         self.pretrained_embeddings.weight = nn.Parameter(torch.tensor(embeddings))
-
+        #print(type(self.pretrained_embeddings))
         ### YOUR CODE HERE (~5 Lines)
-        self.embed_to_hidden = nn.Linear(n_features, hidden_size)
-        nn.init.xavier_normal_(self.embed_to_hidden, gain=1)
+        self.embed_to_hidden = nn.Linear(n_features*self.embed_size, hidden_size)
+        nn.init.xavier_normal_(self.embed_to_hidden.weight, gain=1)
 
         self.dropout = nn.Dropout(p=dropout_prob)
 
         self.hidden_to_logits = nn.Linear(hidden_size, n_classes)
-        nn.init.xavier_normal_(self.hidden_to_logits, gain=1)
+        nn.init.xavier_normal_(self.hidden_to_logits.weight, gain=1)
 
 
         ### TODO:
@@ -100,6 +100,9 @@ class ParserModel(nn.Module):
                                 (batch_size, n_features * embed_size)
         """
         ### YOUR CODE HERE (~1-3 Lines)
+        embedded_t = self.pretrained_embeddings(t)
+        x = embedded_t.view(t.shape[0],self.n_features*self.embed_size)
+
         ### TODO:
         ###     1) Use `self.pretrained_embeddings` to lookup the embeddings for the input tokens in `t`.
         ###     2) After you apply the embedding lookup, you will have a tensor shape (batch_size, n_features, embedding_size).
@@ -137,6 +140,11 @@ class ParserModel(nn.Module):
                                  without applying softmax (batch_size, n_classes)
         """
         ###  YOUR CODE HERE (~3-5 lines)
+        x = self.embedding_lookup(t)
+        hidden = self.embed_to_hidden(x).clamp(min=0)
+        hidden_dropout = self.dropout(hidden)
+        logits = self.hidden_to_logits(hidden_dropout)
+
         ### TODO:
         ###     1) Apply `self.embedding_lookup` to `t` to get the embeddings
         ###     2) Apply `embed_to_hidden` linear layer to the embeddings
