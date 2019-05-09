@@ -34,6 +34,9 @@ class ModelEmbeddings(nn.Module):
         tgt_pad_token_idx = vocab.tgt['<pad>']
 
         ### YOUR CODE HERE (~2 Lines)
+        self.source = nn.Embedding(len(vocab.src) + 1, self.embed_size)
+        self.target = nn.Embedding(len(vocab.tgt) + 1, self.embed_size)
+
         ### TODO - Initialize the following variables:
         ###     self.source (Embedding Layer for source language)
         ###     self.target (Embedding Layer for target langauge)

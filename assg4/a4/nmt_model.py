@@ -53,6 +53,15 @@ class NMT(nn.Module):
 
 
         ### YOUR CODE HERE (~8 Lines)
+        self.encoder = nn.LSTM(embed_size, self.hidden_size, bias=True, bidirectional=True)
+        self.decoder = nn.LSTMCell(self.hidden_size, embed_size, bias=True)
+        self.h_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.c_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.att_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.combined_output_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.target_vocab_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.dropout = nn.Dropout(dropout_rate)
+
         ### TODO - Initialize the following variables:
         ###     self.encoder (Bidirectional LSTM with bias)
         ###     self.decoder (LSTM Cell with bias)
@@ -132,6 +141,10 @@ class NMT(nn.Module):
         enc_hiddens, dec_init_state = None, None
 
         ### YOUR CODE HERE (~ 8 Lines)
+        X = self.model_embeddings(source_padded)
+        packed_X = pack_padded_sequence(X)
+        enc_hiddens, last_hidden, last_cell = self.encode(packed_X)
+
         ### TODO:
         ###     1. Construct Tensor `X` of source sentences with shape (src_len, b, e) using the source model embeddings.
         ###         src_len = maximum source sentence length, b = batch size, e = embedding size. Note
@@ -139,7 +152,7 @@ class NMT(nn.Module):
         ###     2. Compute `enc_hiddens`, `last_hidden`, `last_cell` by applying the encoder to `X`.
         ###         - Before you can apply the encoder, you need to apply the `pack_padded_sequence` function to X.
         ###         - After you apply the encoder, you need to apply the `pad_packed_sequence` function to enc_hiddens.
-        ###         - Note that the shape of the tensor returned by the encoder is (src_len b, h*2) and we want to
+        ###         - Note that the shape of the tensor returned by the encoder is (src_len, b, h*2) and we want to
         ###           return a tensor of shape (b, src_len, h*2) as `enc_hiddens`.
         ###     3. Compute `dec_init_state` = (init_decoder_hidden, init_decoder_cell):
         ###         - `init_decoder_hidden`:
