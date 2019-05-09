@@ -55,8 +55,8 @@ class NMT(nn.Module):
         ### YOUR CODE HERE (~8 Lines)
         self.encoder = nn.LSTM(embed_size, self.hidden_size, bias=True, bidirectional=True)
         self.decoder = nn.LSTMCell(self.hidden_size, embed_size, bias=True)
-        self.h_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
-        self.c_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.h_projection = nn.Linear(self.hidden_size * 2, self.hidden_size, bias=False)
+        self.c_projection = nn.Linear(self.hidden_size * 2, self.hidden_size, bias=False)
         self.att_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
         self.combined_output_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
         self.target_vocab_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
@@ -141,9 +141,15 @@ class NMT(nn.Module):
         enc_hiddens, dec_init_state = None, None
 
         ### YOUR CODE HERE (~ 8 Lines)
-        X = self.model_embeddings(source_padded)
+        X = self.model_embeddings.source(source_padded)
         packed_X = pack_padded_sequence(X)
-        enc_hiddens, last_hidden, last_cell = self.encode(packed_X)
+        enc_hiddens, last_hidden, last_cell = self.encoder(packed_X)
+        enc_hiddens = enc_hiddens.transpose(0,1)
+
+        init_decoder_hidden, init_decoder_cell = None, None
+        init_decoder_hidden = torch.cat((last_hidden[0,:,:], last_hidden[1,:,:]), 1)
+        init_decoder_cell = torch.cat((last_cell[0,:,:], last_cell[1,:,:]), 1)
+        dec_init_state = (init_decoder_hidden, init_decoder_cell)
 
         ### TODO:
         ###     1. Construct Tensor `X` of source sentences with shape (src_len, b, e) using the source model embeddings.
@@ -211,6 +217,16 @@ class NMT(nn.Module):
         combined_outputs = []
 
         ### YOUR CODE HERE (~9 Lines)
+        enc_hiddens_proj = self.h_projection(enc_hiddens)
+        Y = self.model_embeddings.target(target_padded)
+        for Y_t in Y.split(1):
+            Y_t = Y_t.squeeze()
+            Ybar_t = torch.cat((Y_t, o_prev), 1)
+            dec_state, o_t, e_t = self.step(Ybar_t, dec_state, enc_hiddens, enc_hiddens_proj, enc_masks)
+            combined_outputs.append(o_t)
+            o_prev = o_t
+        combined_outputs = torch.stack(combined_outputs,0)
+
         ### TODO:
         ###     1. Apply the attention projection layer to `enc_hiddens` to obtain `enc_hiddens_proj`,
         ###         which should be shape (b, src_len, h),
@@ -282,6 +298,7 @@ class NMT(nn.Module):
         combined_output = None
 
         ### YOUR CODE HERE (~3 Lines)
+        des_state = self.decoder(Ybar_t)
         ### TODO:
         ###     1. Apply the decoder to `Ybar_t` and `dec_state`to obtain the new dec_state.
         ###     2. Split dec_state into its two parts (dec_hidden, dec_cell)
