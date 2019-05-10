@@ -57,8 +57,8 @@ class NMT(nn.Module):
         self.decoder = nn.LSTMCell(self.hidden_size, embed_size, bias=True)
         self.h_projection = nn.Linear(self.hidden_size * 2, self.hidden_size, bias=False)
         self.c_projection = nn.Linear(self.hidden_size * 2, self.hidden_size, bias=False)
-        self.att_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
-        self.combined_output_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.att_projection = nn.Linear(self.hidden_size * 2, self.hidden_size, bias=False)
+        self.combined_output_projection = nn.Linear(self.hidden_size * 3, self.hidden_size, bias=False)
         self.target_vocab_projection = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
         self.dropout = nn.Dropout(dropout_rate)
 
@@ -298,7 +298,10 @@ class NMT(nn.Module):
         combined_output = None
 
         ### YOUR CODE HERE (~3 Lines)
-        des_state = self.decoder(Ybar_t)
+        des_state = self.decoder(Ybar_t, dec_state)
+        dec_hidden, dec_cell = des_state
+        e_t = torch.bmm(dec_hidden.unsqueeze(1), enc_hiddens_proj.transpose(1,2)).unsqueeze(1)
+
         ### TODO:
         ###     1. Apply the decoder to `Ybar_t` and `dec_state`to obtain the new dec_state.
         ###     2. Split dec_state into its two parts (dec_hidden, dec_cell)
@@ -329,17 +332,22 @@ class NMT(nn.Module):
             e_t.data.masked_fill_(enc_masks.byte(), -float('inf'))
 
         ### YOUR CODE HERE (~6 Lines)
+        alpha_t = F.softmax(e_t)
+        a_t = torch.bmm(alpha_t, enc_hiddens).squeeze(1)
+        U_t = torch.cat((a_t, dec_hidden), 1)
+        V_t = self.combined_output_projection(U_t)
+        O_t = self.dropout(torch.tanh(V_t))
+
         ### TODO:
         ###     1. Apply softmax to e_t to yield alpha_t
         ###     2. Use batched matrix multiplication between alpha_t and enc_hiddens to obtain the
         ###         attention output vector, a_t.
-        #$$     Hints:
+        ###     Hints:
         ###           - alpha_t is shape (b, src_len)
         ###           - enc_hiddens is shape (b, src_len, 2h)
         ###           - a_t should be shape (b, 2h)
         ###           - You will need to do some squeezing and unsqueezing.
         ###     Note: b = batch size, src_len = maximum source length, h = hidden size.
-        ###
         ###     3. Concatenate dec_hidden with a_t to compute tensor U_t
         ###     4. Apply the combined output projection layer to U_t to compute tensor V_t
         ###     5. Compute tensor O_t by first applying the Tanh function and then the dropout layer.
